@@ -1,0 +1,363 @@
+///$tab Main
+//Binary;
+ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$ ###0.00;-$ ###0.00';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='M/D/YYYY';
+SET TimestampFormat='M/D/YYYY h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;-12:p;-15:f;-18:a;-21:z;-24:y';
+
+SET vTodaysDate = '3/12/2016';
+SET vPreviousQ = 'Q4-15';
+SET vCurrency = "'[ExRate_' & CURRENCY &']'";
+SET vFutureQ = "Q2-16";
+SET vCurrentQ = "Q1-16";
+SET vPrevQ = "=if(Ceil(Month(vTodaysDate)/3)=1,Right(Year(vTodaysDate),2)-1,Right(Year(vTodaysDate),2))& if(Ceil(Month(vTodaysDate)/3)=1,4,Ceil(Month(vTodaysDate)/3)-1)";
+SET vFutQ = "=num(if(Ceil(Month(vTodaysDate)/3)=4,Right(Year(vTodaysDate),2)+1,Right(Year(vTodaysDate),2)) & if(Ceil(Month(vTodaysDate)/3)=4,1,Ceil(Month(vTodaysDate)/3)+1) )";
+
+SET libPath = 'lib://ActiveDemo:ActiveDemoS3';
+
+//IMPORTANT: SET YOUR TRIGRAM HERE!!!!!!!
+SET TRIGRAM = 'ghm';
+
+///$tab Account
+account:
+LOAD
+    AccountId,
+    "Account Rep Name",
+    //"Account Type",
+    "Account Billing Street",
+    "Account Billing City",
+    "Account Billing State"
+    //"Account Billing Zip",
+    //"Account Billing Country",
+    //"Account Industry"
+FROM [$(libPath)/qvds/CRM/Account.qvd]
+(qvd);
+
+
+
+///$tab Opportunities
+[opps]:
+LOAD
+    "Account Billing Country",
+    "Account Billing Zip",
+    "Account Industry",
+    "Account Type",
+    AccountId,
+    "Opportunity Amount",
+    "Opportunity Close Date",
+    "Opportunity Created Date",
+    "Opportunity Name",
+    "Opportunity Status",
+    "Opportunity Type",
+    "Opportunity Won/Lost",
+    OpportunityId,
+    "Product Name"
+    //,Quota as Quota2
+
+FROM [lib://ActiveDemo:DataFiles/activedb.crm_closedopps.qvd] (qvd);
+
+LOAD
+    "Account Billing Country",
+    "Account Billing Zip",
+    "Account Industry",
+    "Account Type",
+    AccountId,
+    "Opportunity Amount",
+    "Opportunity Close Date",
+    "Opportunity Created Date",
+    "Opportunity Name",
+    "Opportunity Status",
+    "Opportunity Type",
+    "Opportunity Won/Lost",
+    OpportunityId,
+    "Product Name"
+    //,Quota as Quota2
+FROM [lib://ActiveDemo:DataFiles/activedb.crm_openopps.qvd] (qvd);
+
+/////////////////////////////
+////DEMO SETUP FOR AUTOML////
+SET AutoMLPath =  '$(libPath)/AutoML/$(TRIGRAM)';
+NoConcatenate
+
+temp:
+load * resident opps
+where "Opportunity Status" = 'CLOSED';
+
+store temp into $(AutoMLPath)/closedopps_ml.csv (txt, delimiter is ',');
+
+drop table temp;
+
+NoConcatenate
+
+temp:
+load * resident opps
+where "Opportunity Status" = 'OPEN';
+
+store temp into $(AutoMLPath)/openopps_ml.csv (txt, delimiter is ',');
+
+drop table temp;
+/////////////////////////////
+
+
+
+
+
+///$tab Opportunity Detail
+[oppsdetail]:
+LOAD
+    OpportunityId,
+    OpportunityIdCount,
+    Opportunity_Count,
+    "Customer Account Id",
+    "Opportunity Stage",
+    ExRate_ARS,
+    ExRate_AUD,
+    ExRate_BRL,
+    ExRate_CAD,
+    ExRate_CHF,
+    ExRate_DKK,
+    ExRate_EUR,
+    ExRate_GBP,
+    ExRate_HKD,
+    ExRate_INR,
+    ExRate_JPY,
+    ExRate_MXN,
+    ExRate_NOK,
+    ExRate_SEK,
+    ExRate_SGD,
+    ExRate_USD,
+    "Opportunity Probability",
+    "Opportunity Open_Flag",
+    "Opportunity Closed_Flag",
+    "Opportunity Won_Flag",
+    "Opportunity Forecast Category",
+    "User Id"
+FROM [$(libPath)/qvds/CRM/OpportunityDetail.qvd]
+(qvd);
+
+
+
+
+
+
+///$tab Opportunity Line Item
+opportunitylineitem:
+LOAD
+    OpportunityId,
+    PricebookEntryId,
+    "Opportunity Qty"
+FROM [$(libPath)/qvds/CRM/OpportunityLineItem.qvd]
+(qvd);
+
+
+
+
+///$tab Pricebook Entry
+pricebookentry:
+LOAD
+    PricebookEntryId,
+    Product2Id
+FROM [$(libPath)/qvds/CRM/PriceBookEntry.qvd]
+(qvd);
+
+
+///$tab Product
+product:
+LOAD
+    Product2Id//,
+    //"Product Name"
+FROM [$(libPath)/qvds/CRM/Product.qvd]
+(qvd);
+
+
+///$tab User
+user:
+LOAD
+    "User Id",
+    "User Full Name"
+    ,Quota
+FROM [$(libPath)/qvds/CRM/User.qvd]
+(qvd);
+
+
+
+
+///$tab Opp Name
+oppname:
+LOAD
+    CURRENCY
+FROM [$(libPath)/qvds/CRM/OppName.qvd]
+(qvd);
+
+
+
+///$tab Opportunity Predictions
+// // //EDIT: USE YOUR AUTOML REST CONNECTOR HERE
+// // LIB CONNECT TO 'Active Intelligence Demo:Qlik AutoML CRM Demo;
+
+
+
+IF vReload >= 1 then
+
+LIB CONNECT TO 'Active_Intelligence:Qlik_Auto-ML';
+
+Set vPredict = 1;
+// DO NOT EDIT
+RestConnectorMasterTable:
+SQL SELECT 
+	"K_Account Billing Country_influence",
+	"K_Account Billing Zip_influence",
+	"K_Account Industry_influence",
+	"K_AccountId_influence",
+	"K_Opportunity Amount_influence",
+	"K_Opportunity Name_influence",
+	"K_Opportunity Type_influence",
+	"OpportunityId",
+	"K_OpportunityId_influence",
+	"K_Product Name_influence",
+	"Opportunity Won/Lost_predicted",
+	"Opportunity Won/Lost_predicted_LOST",
+	"Opportunity Won/Lost_predicted_WON"
+FROM CSV (header on, delimiter ",", quote """") "CSV_source";
+
+[Opportunity Predictions]:
+LOAD	[K_Account Billing Country_influence],
+	[K_Account Billing Zip_influence],
+	[K_Account Industry_influence],
+	[K_AccountId_influence],
+	[K_Opportunity Amount_influence],
+	[K_Opportunity Name_influence],
+	[K_Opportunity Type_influence],
+	[OpportunityId],
+	[K_OpportunityId_influence],
+	[K_Product Name_influence],
+	[Opportunity Won/Lost_predicted],
+	[Opportunity Won/Lost_predicted_LOST],
+	[Opportunity Won/Lost_predicted_WON]
+RESIDENT RestConnectorMasterTable;
+
+
+DROP TABLE RestConnectorMasterTable;
+
+else
+Set vPredict = 0;
+
+EndIf
+///$tab Auto-generated section
+///$autogenerated
+
+
+Unqualify *;
+
+__countryAliasesBase:
+LOAD
+	Alias AS [__Country],
+	ISO3Code AS [__ISO3Code]
+FROM [lib://Active_Intelligence:DataFiles/countryAliases.qvd]
+(qvd);
+
+__countryGeoBase:
+LOAD
+	ISO3Code AS [__ISO3Code],
+	ISO2Code AS [__ISO2Code],
+	Polygon AS [__Polygon]
+FROM [lib://Active_Intelligence:DataFiles/countryGeo.qvd]
+(qvd);
+
+__countryName2IsoThree:
+MAPPING LOAD
+	__Country,
+	__ISO3Code
+RESIDENT __countryAliasesBase;
+
+__countryCodeIsoThree2Polygon:
+MAPPING LOAD
+	__ISO3Code,
+	__Polygon
+RESIDENT __countryGeoBase;
+
+[opps_temp_39e445d8-bff6-4cfc-de0c-426f9e72]:
+LOAD
+	[OpportunityId],
+	[AccountId],
+	[Account Billing Country],
+	[Account Billing Zip],
+	[Account Industry],
+	[Account Type],
+	[Opportunity Amount],
+	Date(Date#([Opportunity Close Date], 'DD-MM-YYYY') ,'DD/MM/YYYY') AS [Opportunity Close Date],
+	Date(Date#([Opportunity Created Date], 'DD-MM-YYYY') ,'DD/MM/YYYY') AS [Opportunity Created Date],
+	[Opportunity Name],
+	[Opportunity Status],
+	[Opportunity Type],
+	[Opportunity Won/Lost],
+	[Product Name],
+	APPLYMAP( '__countryCodeIsoThree2Polygon', APPLYMAP( '__countryName2IsoThree', LOWER([Account Billing Country])), '-') AS [opps.Account Billing Country_GeoInfo],
+	IF([Opportunity Status] = 'OPEN' , 'OPEN', [Opportunity Won/Lost] ) AS [Opportunity Triphase],
+	if([Opportunity Status] = 'OPEN','0', 
+if([Opportunity Won/Lost] = '-', '0', '1'
+)) AS [Opportunity is Closed?],
+	if([Opportunity Won/Lost] = 'WON',1,0) AS [Opportunity is Won?]
+RESIDENT [opps];
+DROP TABLE [opps];
+
+RENAME TABLE [oppname] to [CURRENCY];
+
+
+
+TAG FIELD [Account Billing Country] WITH '$geoname', '$relates_opps.Account Billing Country_GeoInfo';
+TAG FIELD [opps.Account Billing Country_GeoInfo] WITH '$geopolygon', '$hidden', '$relates_Account Billing Country';RENAME TABLE [opps_temp_39e445d8-bff6-4cfc-de0c-426f9e72] to [opps];
+
+DROP TABLES __countryAliasesBase, __countryGeoBase;
+[autoCalendar]: 
+  DECLARE FIELD DEFINITION Tagged ('$date')
+FIELDS
+  Dual(Year($1), YearStart($1)) AS [Year] Tagged ('$axis', '$year'),
+  Dual('Q'&Num(Ceil(Num(Month($1))/3)),Num(Ceil(NUM(Month($1))/3),00)) AS [Quarter] Tagged ('$quarter', '$cyclic'),
+  Dual(Year($1)&'-Q'&Num(Ceil(Num(Month($1))/3)),QuarterStart($1)) AS [YearQuarter] Tagged ('$yearquarter', '$qualified'),
+  Dual('Q'&Num(Ceil(Num(Month($1))/3)),QuarterStart($1)) AS [_YearQuarter] Tagged ('$yearquarter', '$hidden', '$simplified'),
+  Month($1) AS [Month] Tagged ('$month', '$cyclic'),
+  Dual(Year($1)&'-'&Month($1), monthstart($1)) AS [YearMonth] Tagged ('$axis', '$yearmonth', '$qualified'),
+  Dual(Month($1), monthstart($1)) AS [_YearMonth] Tagged ('$axis', '$yearmonth', '$simplified', '$hidden'),
+  Dual('W'&Num(Week($1),00), Num(Week($1),00)) AS [Week] Tagged ('$weeknumber', '$cyclic'),
+  Date(Floor($1)) AS [Date] Tagged ('$axis', '$date', '$qualified'),
+  Date(Floor($1), 'D') AS [_Date] Tagged ('$axis', '$date', '$hidden', '$simplified'),
+  If (DayNumberOfYear($1) <= DayNumberOfYear(Today()), 1, 0) AS [InYTD] ,
+  Year(Today())-Year($1) AS [YearsAgo] ,
+  If (DayNumberOfQuarter($1) <= DayNumberOfQuarter(Today()),1,0) AS [InQTD] ,
+  4*Year(Today())+Ceil(Month(Today())/3)-4*Year($1)-Ceil(Month($1)/3) AS [QuartersAgo] ,
+  Ceil(Month(Today())/3)-Ceil(Month($1)/3) AS [QuarterRelNo] ,
+  If(Day($1)<=Day(Today()),1,0) AS [InMTD] ,
+  12*Year(Today())+Month(Today())-12*Year($1)-Month($1) AS [MonthsAgo] ,
+  Month(Today())-Month($1) AS [MonthRelNo] ,
+  If(WeekDay($1)<=WeekDay(Today()),1,0) AS [InWTD] ,
+  (WeekStart(Today())-WeekStart($1))/7 AS [WeeksAgo] ,
+  Week(Today())-Week($1) AS [WeekRelNo] ;
+
+DERIVE FIELDS FROM FIELDS [Opportunity Close Date], [Opportunity Created Date] USING [autoCalendar] ;
+///$tab end
+// vReload = alt('$(vReload)',0);
+
+// // Reports current load
+// // LET ReloadMessage = 'This reload iteration: ' & $(vReload) & ' of 4 with ' & Num(NoOfRows('Orders'),'#,###') & ' rows';
+// // Trace $(ReloadMessage);
+
+// LET vCurrentReload = vReload;
+
+// // Moves the script to the next load of additional data
+// LET vReload = if(vReload = 1, 0, vReload + 1);
